@@ -23,6 +23,7 @@ impl MathInputImpl {
       } else {
         match splitted {
           "+" => result += sum_two_nums(&mut stack),
+          "-" => result += minus_two_nums(&mut stack),
           _ => (),
         }
       }
@@ -46,24 +47,47 @@ fn is_numeric(str: &str) -> bool {
 }
 
 fn sum_two_nums(stack: &mut Vec<&str>) -> i32 {
+  let (first, second) = get_two_nums_from_stack(stack);
+  first + second
+}
+
+fn get_two_nums_from_stack(stack: &mut Vec<&str>) -> (i32, i32) {
   let second: i32 = stack.pop().unwrap().parse().unwrap();
   let first: i32 = stack.pop().unwrap().parse().unwrap();
-  first + second
+  return (first, second);
+}
+
+fn minus_two_nums(stack: &mut Vec<&str>) -> i32 {
+  let (first, second) = get_two_nums_from_stack(stack);
+  first - second
 }
 
 #[cfg(test)]
 mod math_input_tests {
   use super::*;
 
-  #[test]
-  fn sum_two_numbers() {
+  fn create_input_and_data_view() -> (MathInputImpl, Rc<RefCell<DataView>>) {
     let data_view = Rc::new(RefCell::new(DataView { output: String::new() }));
     let input = MathInputImpl {
       data_view: Rc::clone(&data_view),
     };
+    (input, data_view)
+  }
+  #[test]
+  fn sum_two_numbers() {
+    let (input, data_view) = create_input_and_data_view();
 
     input.calculate("1 + 2");
 
     assert_eq!("3", (*data_view).borrow_mut().output);
+  }
+
+  #[test]
+  fn minus_two_numbers() {
+    let (input, data_view) = create_input_and_data_view();
+
+    input.calculate("1 - 2");
+
+    assert_eq!("-1", (*data_view).borrow_mut().output);
   }
 }
