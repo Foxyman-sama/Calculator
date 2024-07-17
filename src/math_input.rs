@@ -25,6 +25,7 @@ impl MathInputImpl {
           "+" => result += sum_two_nums(&mut stack),
           "-" => result += minus_two_nums(&mut stack),
           "*" => result += multiply_two_numbers(&mut stack),
+          "/" => result += divide_two_numbers(&mut stack),
           _ => (),
         }
       }
@@ -68,6 +69,11 @@ fn multiply_two_numbers(stack: &mut Vec<&str>) -> i32 {
   first * second
 }
 
+fn divide_two_numbers(stack: &mut Vec<&str>) -> i32 {
+  let (first, second) = get_two_nums_from_stack(stack);
+  first / second
+}
+
 #[cfg(test)]
 mod math_input_tests {
   use super::*;
@@ -104,5 +110,14 @@ mod math_input_tests {
     input.calculate("2 * 3");
 
     assert_eq!("6", (*data_view).borrow_mut().output);
+  }
+
+  #[test]
+  fn divide_two_numbers() {
+    let (input, data_view) = create_input_and_data_view();
+
+    input.calculate("2 / 2");
+
+    assert_eq!("1", (*data_view).borrow_mut().output);
   }
 }
