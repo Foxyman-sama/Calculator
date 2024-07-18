@@ -1,3 +1,5 @@
+use std::borrow::{Borrow, BorrowMut};
+
 use glow::HasContext;
 use imgui::Context;
 use imgui_glow_renderer::AutoRenderer;
@@ -8,19 +10,25 @@ use sdl2::{
 };
 
 pub trait MathInput {
-  fn calculate(&self, expr: &str) -> i128;
+  fn calculate(&self, expr: &str) -> i32;
 }
 
-pub struct UI {
+struct SDLWindowBackend<'a> {
+  context: &'a mut Context,
+  platform: &'a mut SdlPlatform,
+  renderer: &'a mut AutoRenderer,
+}
+
+pub struct CalculatorWindow {
   title: &'static str,
   width: u32,
   height: u32,
   input: Box<dyn MathInput>,
 }
 
-impl UI {
-  pub fn new(title: &'static str, width: u32, height: u32, input: Box<dyn MathInput>) -> UI {
-    UI {
+impl CalculatorWindow {
+  pub fn new(title: &'static str, width: u32, height: u32, input: Box<dyn MathInput>) -> CalculatorWindow {
+    CalculatorWindow {
       title,
       width,
       height,
@@ -28,18 +36,14 @@ impl UI {
     }
   }
 
-  pub fn run(&self) {
-    /* initialize SDL and its video subsystem */
+  pub fn show(&self) {
     let sdl = sdl2::init().unwrap();
     let video_subsystem = sdl.video().unwrap();
 
-    /* hint SDL to initialize an OpenGL 3.3 core profile context */
     let gl_attr = video_subsystem.gl_attr();
-
     gl_attr.set_context_version(3, 3);
     gl_attr.set_context_profile(GLProfile::Core);
 
-    /* create a new window, be sure to call opengl method on the builder when using glow! */
     let window = video_subsystem
       .window(&self.title, self.width, self.height)
       .allow_highdpi()
@@ -49,39 +53,33 @@ impl UI {
       .build()
       .unwrap();
 
-    /* create a new OpenGL context and make it current */
     let gl_context = window.gl_create_context().unwrap();
     window.gl_make_current(&gl_context).unwrap();
-
-    /* enable vsync to cap framerate */
     window.subsystem().gl_set_swap_interval(1).unwrap();
 
-    /* create new glow and imgui contexts */
     let gl = glow_context(&window);
 
-    /* create context */
-    let mut imgui = Context::create();
+    let mut context = Context::create();
+    context.set_ini_filename(None);
+    context.set_log_filename(None);
 
-    /* disable creation of files on disc */
-    imgui.set_ini_filename(None);
-    imgui.set_log_filename(None);
+    let mut platform = SdlPlatform::init(&mut context);
+    let mut renderer = AutoRenderer::initialize(gl, &mut context).unwrap();
 
-    /* setup platform and renderer, and fonts to imgui */
-    imgui
-      .fonts()
-      .add_font(&[imgui::FontSource::DefaultFontData { config: None }]);
+    let mut window_backend = SDLWindowBackend {
+      context: &mut context,
+      platform: &mut platform,
+      renderer: &mut renderer,
+    };
 
-    /* create platform and renderer */
-    let mut platform = SdlPlatform::init(&mut imgui);
-    let mut renderer = AutoRenderer::initialize(gl, &mut imgui).unwrap();
-
-    /* start main loop */
     let mut event_pump = sdl.event_pump().unwrap();
 
     'main: loop {
       for event in event_pump.poll_iter() {
         /* pass all events to imgui platfrom */
-        platform.handle_event(&mut imgui, &event);
+        window_backend
+          .platform
+          .handle_event(&mut window_backend.context, &event);
 
         if let Event::Quit { .. } = event {
           break 'main;
@@ -89,36 +87,52 @@ impl UI {
       }
 
       /* call prepare_frame before calling imgui.new_frame() */
-      platform.prepare_frame(&mut imgui, &window, &event_pump);
+      window_backend
+        .platform
+        .prepare_frame(&mut window_backend.context, &window, &event_pump);
 
-      let ui = imgui.new_frame();
-      /* create imgui UI here */
-
-      ui.window("Hello world")
-        .size([300.0, 100.0], imgui::Condition::FirstUseEver)
-        .build(|| {
-          ui.text("Write your text:");
-
-          let mut buf = String::new();
-          ui.input_text(" ", &mut buf).build();
-          ui.text(&buf);
-          if ui.button("Рассчитать") {
-            self.input.calculate(&buf);
-          }
-        });
-
-      /* render */
-      let draw_data = imgui.render();
-
-      unsafe { renderer.gl_context().clear(glow::COLOR_BUFFER_BIT) };
-      renderer.render(draw_data).unwrap();
-
-      window.gl_swap_window();
+      show_main_window(&mut window_backend, &self.input);
+      render(&mut window_backend, &window);
     }
   }
 }
 
-// Create a new glow context.
+fn show_main_window(window_backend: &mut SDLWindowBackend, input: &Box<dyn MathInput>) {
+  let ui = window_backend.context.new_frame();
+  let input_text = show_output_window(ui);
+}
+
+fn show_output_window(ui: &mut imgui::Ui) -> String {
+  const WINDOW_TITLE: &'static str = "Calculator";
+  const WINDOW_WIDTH: f32 = 300.;
+  const WINDOW_HEIGHT: f32 = 400.;
+
+  let mut result = String::new();
+
+  ui.window(WINDOW_TITLE)
+    .size([WINDOW_WIDTH, WINDOW_HEIGHT], imgui::Condition::FirstUseEver)
+    .build(|| {
+      const INPUT_FIELD_WIDTH: f32 = 200.;
+      const INPUT_FIELD_HEIGHT: f32 = 60.;
+      let win_size = ui.window_size();
+      ui.set_cursor_pos([(win_size[0] - INPUT_FIELD_WIDTH) * 0.5, 50.]);
+      ui.set_next_item_width(INPUT_FIELD_WIDTH);
+      ui.input_text_multiline("###input", &mut result, [INPUT_FIELD_WIDTH, INPUT_FIELD_HEIGHT])
+        .build();
+    });
+
+  result
+}
+
+fn render(window_backend: &mut SDLWindowBackend, window: &Window) {
+  let draw_data = window_backend.context.render();
+
+  unsafe { window_backend.renderer.gl_context().clear(glow::COLOR_BUFFER_BIT) };
+  window_backend.renderer.render(draw_data).unwrap();
+
+  window.gl_swap_window();
+}
+
 fn glow_context(window: &Window) -> glow::Context {
   unsafe { glow::Context::from_loader_function(|s| window.subsystem().gl_get_proc_address(s) as _) }
 }

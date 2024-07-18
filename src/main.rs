@@ -4,14 +4,14 @@ mod ui;
 struct Mock;
 
 impl ui::MathInput for Mock {
-  fn calculate(&self, expr: &str) -> i128 {
+  fn calculate(&self, expr: &str) -> i32 {
     println!("{}", expr);
     2
   }
 }
 
 fn main() {
-  let interface = ui::UI::new("hello, world!", 1280, 720, Box::new(Mock));
+  let interface = ui::CalculatorWindow::new("hello, world!", 1280, 720, Box::new(Mock));
 
-  interface.run();
+  interface.show();
 }

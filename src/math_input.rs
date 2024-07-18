@@ -35,7 +35,7 @@ impl MathInputImpl {
           "*" => multiply_two_numbers(&mut stack),
           "/" => divide_two_numbers(&mut stack),
           _ => {
-            self.update_output_with_error(errors::NON_NUMERIC_ERROR);
+            self.set_error_in_output(errors::NON_NUMERIC_ERROR);
             return;
           }
         }
@@ -49,7 +49,7 @@ impl MathInputImpl {
     (*self.data_view).borrow_mut().output = stack.pop().unwrap();
   }
 
-  fn update_output_with_error(&self, error_msg: &str) {
+  fn set_error_in_output(&self, error_msg: &str) {
     (*self.data_view).borrow_mut().output = String::from(error_msg);
   }
 }
