@@ -99,29 +99,31 @@ impl CalculatorWindow {
 
 fn show_main_window(window_backend: &mut SDLWindowBackend, input: &Box<dyn MathInput>) {
   let ui = window_backend.context.new_frame();
-  let input_text = show_output_window(ui);
-}
-
-fn show_output_window(ui: &mut imgui::Ui) -> String {
   const WINDOW_TITLE: &'static str = "Calculator";
-  const WINDOW_WIDTH: f32 = 300.;
-  const WINDOW_HEIGHT: f32 = 400.;
+  const WINDOW_WIDTH: f32 = 310.;
+  const WINDOW_HEIGHT: f32 = 260.;
 
   let mut result = String::new();
 
   ui.window(WINDOW_TITLE)
     .size([WINDOW_WIDTH, WINDOW_HEIGHT], imgui::Condition::FirstUseEver)
     .build(|| {
-      const INPUT_FIELD_WIDTH: f32 = 200.;
+      const INPUT_FIELD_WIDTH: f32 = WINDOW_WIDTH;
       const INPUT_FIELD_HEIGHT: f32 = 60.;
       let win_size = ui.window_size();
-      ui.set_cursor_pos([(win_size[0] - INPUT_FIELD_WIDTH) * 0.5, 50.]);
-      ui.set_next_item_width(INPUT_FIELD_WIDTH);
+      let cursor_pos = ui.cursor_pos();
+      ui.set_cursor_pos([(win_size[0] - INPUT_FIELD_WIDTH) * 0.5, cursor_pos[1]]);
       ui.input_text_multiline("###input", &mut result, [INPUT_FIELD_WIDTH, INPUT_FIELD_HEIGHT])
         .build();
-    });
 
-  result
+      let cursor_pos = ui.cursor_pos();
+      ui.set_cursor_pos([(win_size[0] - INPUT_FIELD_WIDTH) * 0.5, cursor_pos[1]]);
+      ui.columns(3, "hello", false);
+      for i in 1..=9 {
+        ui.button_with_size(i.to_string(), [INPUT_FIELD_WIDTH / 3., 50.]);
+        ui.next_column();
+      }
+    });
 }
 
 fn render(window_backend: &mut SDLWindowBackend, window: &Window) {
